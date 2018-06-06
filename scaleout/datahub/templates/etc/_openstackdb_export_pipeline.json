@@ -15,10 +15,10 @@
 					"main"
 				],
 				"config": {
-					"aws_access_key_id": {{ $content.pipelines.openstackdb_import.key_id }},
-					"aws_secret_access_key": {{ $content.pipelines.openstackdb_import.access_key }},
+					"aws_access_key_id": {{ Values.content.pipelines.openstackdb_import.key_id | quotes }},
+					"aws_secret_access_key": {{ Values.content.pipelines.openstackdb_import.access_key | quotes }},
 					"region": "staging",
-					"endpointURL": "https://objectstore-3.staging.cloud.sap:443",
+					"endpointURL": "https://objectstore-3.{{ Values.region }}.cloud.sap:443",
 					"bucket": "/datalake",
 					"path": "/openstackdb_exports/cinder.volume_attachment.csv",
 					"recursive": false,
