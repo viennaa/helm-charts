@@ -34,7 +34,7 @@ max_allowed_secret_in_bytes = 10000
 max_allowed_request_size_in_bytes = 1000000
 
 {{- if .Values.postgresql.useOperator }}
-sql_connection = postgresql://{{include "db_host" .}}:5432/barbican
+sql_connection = postgresql+psycopg2://{{include "db_host" .}}:5432/barbican
 {{ else }}
 sql_connection = {{ include "db_url" . }}
 {{- end }}
