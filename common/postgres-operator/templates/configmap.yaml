@@ -9,7 +9,7 @@ data:
   # the env var with the same name in the operator pod may overwrite this value
   # if neither is set or evaluates to the empty string, listen to the operator's own namespace
   # if set to the "*", listen to all namespaces
-  watched_namespace: {{ .Release.Namespace }}
+  watched_namespace: "*"
 
   # service-account of the operator
   service_account_name: {{ .Values.serviceaccount.name | default "postgres-operator" }}
