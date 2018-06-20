@@ -248,6 +248,7 @@ postgresql:
 
   backup:
     enabled: false
+    imageTag: v0.5.15
 
 pgmetrics:
   db_name: keystone
