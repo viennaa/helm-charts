@@ -1,5 +1,5 @@
 [auth]
-use_dynamic_credentials = false
+use_dynamic_credentials = true
 create_isolated_networks = false
 test_accounts_file = /etc/keystone/tempest_accounts.yaml
 admin_username = admin

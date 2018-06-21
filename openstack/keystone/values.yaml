@@ -175,6 +175,8 @@ tempest:
   imageTag: "queens-latest"
   adminPassword: DEFINE_IN_REGION_VALUES
   userPassword: DEFINE_IN_REGION_VALUES
+# tempest domain-id  -- do not set in production environments!
+  domainId: not_set_this_in_production
 
 sentry:
   enabled: false
