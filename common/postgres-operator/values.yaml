@@ -13,7 +13,7 @@ replicas: 1
 operator:
   # spilo image
   image: hub.global.cloud.sap/monsoon/spilo
-  imageTag: "20180628155020"
+  imageTag: "20180629065349"
 
 serviceaccount:
   create: true
