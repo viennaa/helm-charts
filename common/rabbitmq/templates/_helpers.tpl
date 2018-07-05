@@ -3,7 +3,7 @@
 Expand the name of the chart.
 */}}
 {{- define "name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | replace "_" "-" | trimSuffix "-" -}}
+    {{- default .Chart.Name .Values.nameOverride | trunc 63 | replace "_" "-" | trimSuffix "-" -}}
 {{- end -}}
 
 {{/*
@@ -11,12 +11,16 @@ Create a default fully qualified app name.
 We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
 */}}
 {{- define "fullname" -}}
-{{- $name := default .Chart.Name .Values.nameOverride -}}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | replace "_" "-" | trimSuffix "-" -}}
+    {{- $name := default .Chart.Name .Values.nameOverride -}}
+    {{- if eq .Release.Name $name -}}
+        {{- printf "%s" $name | trunc 63 | replace "_" "-" | trimSuffix "-" -}}
+    {{- else -}}
+        {{- printf "%s-%s" .Release.Name $name | trunc 63 | replace "_" "-" | trimSuffix "-" -}}
+    {{- end -}}
 {{- end -}}
 
-{{define "release_rabbitmq_host"}}{{.Release.Name}}-rabbitmq.{{.Release.Namespace}}.svc.kubernetes.{{.Values.global.region}}.{{.Values.global.tld}}{{end}}
-
+{{define "release_rabbitmq_host"}}{{ template "fullname" . }}.{{.Release.Namespace}}.svc.kubernetes.{{.Values.global.region}}.{{.Values.global.tld}}{{end}}
+    
 {{- define "rabbitmq.password_for_fixed_user_and_host" }}
     {{- $envAll := index . 0 }}
     {{- $user := index . 1 }}
@@ -35,3 +39,12 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
     {{- $user := index . 1 }}
     {{- tuple $envAll ( $envAll.Values.global.user_suffix | default "" | print $user ) | include "rabbitmq.password_for_fixed_user" }}
 {{- end }}
+
+{{- define "rabbitmq.plugins"}}
+    {{- if gt .Values.replicas 1.0 -}}
+        {{- append .Values.plugins "rabbitmq_peer_discovery_k8s" | join "," -}}
+    {{- else -}}
+        {{- join "," .Values.plugins -}}
+    {{- end -}}
+{{- end }}
+

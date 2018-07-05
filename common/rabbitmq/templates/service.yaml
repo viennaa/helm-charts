@@ -14,10 +14,20 @@ metadata:
     prometheus.io/port: "{{.Values.metrics.port}}"
 {{- end }}
 spec:
+  clusterIP: "None"
   ports:
     - name: public
+      protocol: TCP
       port: {{ default 5672 .Values.ports.public }}
     - name: management
+      protocol: TCP
       port: {{ default 15672 .Values.ports.management }}
+    - name: clustering
+      protocol: TCP
+      port: {{ default 25672 .Values.ports.clustering }}
+    - name: epmd
+      protocol: TCP
+      port: {{ default "4369" .Values.ports.epmd }}
   selector:
     app: {{ template "fullname" . }}
+    release: {{ .Release.Name }}

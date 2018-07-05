@@ -1,25 +1,19 @@
-apiVersion: extensions/v1beta1
-kind: Deployment
+apiVersion: apps/v1beta1
+kind: StatefulSet
 metadata:
   name: {{ template "fullname" . }}
   labels:
     app: {{ template "fullname" . }}
-    chart: "{{ .Chart.Name }}-{{ .Chart.Version }}"
-    release: "{{ .Release.Name }}"
-    heritage: "{{ .Release.Service }}"
+    chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+    release: {{ .Release.Name }}
+    heritage: {{ .Release.Service }}
     component: rabbitmq
-  annotations:
-    checksum/container.init: {{ include (print $.Template.BasePath "/bin-configmap.yaml") . | sha256sum }}
 spec:
+  serviceName: {{ template "fullname" . }}
   replicas: {{ .Values.replicas }}
   revisionHistoryLimit: {{ .Values.upgrades.revisionHistory }}
-  strategy:
-    type: {{ .Values.upgrades.podReplacementStrategy }}
-    {{ if eq .Values.upgrades.podReplacementStrategy "RollingUpdate" }}
-    rollingUpdate:
-      maxUnavailable: {{ .Values.upgrades.rollingUpdate.maxUnavailable }}
-      maxSurge: {{ .Values.upgrades.rollingUpdate.maxSurge }}
-    {{ end }}
+  updateStrategy:
+    type: {{ .Values.upgrades.updateStrategy }}
   selector:
     matchLabels:
       app: {{ template "fullname" . }}
@@ -27,32 +21,44 @@ spec:
     metadata:
       labels:
         app: {{ template "fullname" . }}
+        release: {{ .Release.Name }}
       annotations:
-        pod.beta.kubernetes.io/hostname: {{ template "fullname" . }}
+        checksum/container.init: {{ include (print $.Template.BasePath "/bin-configmap.yaml") . | sha256sum }}
+        checksum/etc.config: {{ include (print $.Template.BasePath "/etc-configmap.yaml") . | sha256sum }}
     spec:
-      hostname: {{ template "fullname" . }}
+      terminationGracePeriodSeconds: 10
       containers:
       - name: rabbitmq
         image: "{{ .Values.image }}:{{.Values.imageTag }}"
         imagePullPolicy: {{ default "IfNotPresent" .Values.imagePullPolicy | quote }}
-        command:
-          - bash
-        args:
-          - /container.init/rabbitmq-start
+        command: ["/container.init/rabbitmq-start"]
         livenessProbe:
-          exec:
-            command:
-            - rabbitmqctl
-            - status
-          initialDelaySeconds: 30
-          timeoutSeconds: 5
+          httpGet:
+            path: /
+            port: management
+          initialDelaySeconds: 180
+          timeoutSeconds: 10
+          periodSeconds: 60
         readinessProbe:
           exec:
-            command:
-            - rabbitmqctl
-            - status
-          initialDelaySeconds: 5
-          timeoutSeconds: 1
+            command: ["rabbitmqctl", "node_health_check"]
+          initialDelaySeconds: 60
+          timeoutSeconds: 10
+          periodSeconds: 10
+        env:
+          - name: MY_POD_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: RABBITMQ_NODENAME
+            value: rabbit@$(MY_POD_NAME).{{ template "release_rabbitmq_host" . }}
+          - name: RABBITMQ_USE_LONGNAME
+            value: "true"
+          - name: K8S_SERVICE_NAME
+            value: {{ template "fullname" . }}
+          - name: RABBITMQ_ERLANG_COOKIE
+            value: "{{ .Values.erlangCookie }}"
         {{- if .Values.resources.enabled }}
         resources:
           limits:
@@ -63,15 +69,25 @@ spec:
             memory: {{ .Values.resources.requests.memory | quote }}
         {{- end }}
         ports:
+          - name: epmd
+            protocol: TCP
+            containerPort: {{ default "4369" .Values.ports.epmd }}
           - name: public
+            protocol: TCP
             containerPort: {{ default "5672" .Values.ports.public }}
           - name: management
+            protocol: TCP
             containerPort: {{ default "15672" .Values.ports.management }}
+          - name: clustering
+            protocol: TCP
+            containerPort: {{ default "25672" .Values.ports.clustering }}
         volumeMounts:
           - name: rabbitmq-persistent-storage
             mountPath: /var/lib/rabbitmq
-          - mountPath: /container.init
-            name: container-init
+          - name: container-init
+            mountPath: /container.init
+          - name: config-volume
+            mountPath: /etc/rabbitmq
 {{- if .Values.metrics.enabled }}
       - name: metrics
         image: "{{ .Values.metrics.image }}:{{.Values.metrics.imageTag }}"
@@ -109,3 +125,12 @@ spec:
         - name: container-init
           configMap:
             name: {{ template "fullname" . }}-bin
+            defaultMode: 0744
+        - name: config-volume
+          configMap:
+            name: {{ template "fullname" . }}-config
+            items:
+              - key: rabbitmq.conf
+                path: rabbitmq.conf
+              - key: enabled_plugins
+                path: enabled_plugins
