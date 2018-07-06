@@ -1,0 +1,14 @@
+# Default values for rabbitmq. 
+# take creds from secrets -> globals
+
+rabbitmq:
+  users:
+    default:
+      user: openstack
+    admin:
+      user: admin
+
+  persistence:
+    enabled: false
+
+  replicas: 2

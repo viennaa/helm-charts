@@ -40,11 +40,5 @@ We truncate at 63 chars because some Kubernetes name fields are limited to this 
     {{- tuple $envAll ( $envAll.Values.global.user_suffix | default "" | print $user ) | include "rabbitmq.password_for_fixed_user" }}
 {{- end }}
 
-{{- define "rabbitmq.plugins"}}
-    {{- if gt .Values.replicas 1.0 -}}
-        {{- append .Values.plugins "rabbitmq_peer_discovery_k8s" | join "," -}}
-    {{- else -}}
-        {{- join "," .Values.plugins -}}
-    {{- end -}}
-{{- end }}
+{{- define "rabbitmq.plugins"}}{{- join "," .Values.plugins -}}{{- end }}
 

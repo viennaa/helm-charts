@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -xe
+set -e
 
 RABBITMQ_PIDFILE=/var/lib/rabbitmq/mnesia/$RABBITMQ_NODENAME.pid
 

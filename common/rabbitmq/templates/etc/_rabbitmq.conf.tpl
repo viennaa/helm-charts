@@ -1,10 +1,9 @@
-# hipe_compile = true
+hipe_compile = {{ .Values.hipe_compile }}
 vm_memory_high_watermark.relative = 0.6
 disk_free_limit.absolute = 1G
 log.console = true
 log.federation.level = debug
 
-{{ if gt .Values.replicas 1.0 }}
 ## Clustering
 cluster_formation.peer_discovery_backend = rabbit_peer_discovery_k8s
 cluster_formation.k8s.host = kubernetes.default.svc.kubernetes.{{.Values.global.region}}.{{.Values.global.tld}}
@@ -22,5 +21,3 @@ cluster_partition_handling = autoheal
 
 ## queue master locator 
 queue_master_locator=min-masters
-## See http://www.rabbitmq.com/access-control.html#loopback-users
-{{ end }}

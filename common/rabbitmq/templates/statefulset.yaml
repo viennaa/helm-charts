@@ -25,6 +25,7 @@ spec:
       annotations:
         checksum/container.init: {{ include (print $.Template.BasePath "/bin-configmap.yaml") . | sha256sum }}
         checksum/etc.config: {{ include (print $.Template.BasePath "/etc-configmap.yaml") . | sha256sum }}
+        dashboard/url: http://{{ template "release_rabbitmq_host" . }}:{{ .Values.ports.management }}
     spec:
       terminationGracePeriodSeconds: 10
       containers:
@@ -101,6 +102,8 @@ spec:
             value: {{ .Values.metrics.password | default (tuple . .Values.metrics.user | include "rabbitmq.password_for_user") | quote }}
           - name: RABBIT_URL
             value: "http://127.0.0.1:{{.Values.ports.management}}"
+          - name: RABBIT_CAPABILITIES
+            value: "bert,no_sort"
         {{- if .Values.metrics.resources.enabled }}
         resources:
           limits:

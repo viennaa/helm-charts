@@ -49,7 +49,7 @@ resources:
 metrics:
   enabled: true
   image: kbudde/rabbitmq-exporter
-  imageTag: 0.16.0
+  imageTag: v0.28.0
   user: monitoring
   password: null
   port: 9150
@@ -65,9 +65,11 @@ metrics:
 plugins:
   - rabbitmq_management
   - rabbitmq_tracing
+  - rabbitmq_peer_discovery_k8s
 
-replicas: 2
-erlangCookie: "SecretErlangCookie"
+replicas: 1
+erlangCookie: "DefaultErlangSecretCookie"
+hipe_compile: "true"
 
 upgrades:
   updateStrategy: RollingUpdate
