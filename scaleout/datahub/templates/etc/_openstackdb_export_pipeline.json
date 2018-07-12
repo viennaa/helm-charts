@@ -15,10 +15,10 @@
 					"main"
 				],
 				"config": {
-					"aws_access_key_id": {{ Values.content.pipelines.openstackdb_import.key_id | quotes }},
-					"aws_secret_access_key": {{ Values.content.pipelines.openstackdb_import.access_key | quotes }},
-					"region": "staging",
-					"endpointURL": "https://objectstore-3.{{ Values.region }}.cloud.sap:443",
+					"aws_access_key_id": {{ $.Values.content.pipelines.openstackdb_import.key_id | quotes }},
+					"aws_secret_access_key": {{ $.Values.content.pipelines.openstackdb_import.access_key | quotes }},
+					"region": "i{{ $.Values.region }}",
+					"endpointURL": "https://objectstore-3.{{ $.Values.region }}.cloud.sap:443",
 					"bucket": "/datalake",
 					"path": "/openstackdb_exports/cinder.volume_attachment.csv",
 					"recursive": false,
@@ -39,7 +39,7 @@
 				"width": 120,
 				"ui": "dynpath",
 				"config": {
-					"spoolSize": 10
+					"spoolSize": 10000
 				}
 			}
 		},
@@ -58,8 +58,10 @@
 					"dsn": "v2://vora-tx-coordinator:10002/?binary=true",
 					"ingestionMode": "UPSERT",
 					"user": "default\\ingestor",
-					"password": "{{ $.vora.ingestor.password }}",
-					"databaseSchema": "OPENSTACK"
+					"password": "{{ $.Values.datahub.ingestor.password }}",
+					"databaseSchema": "OPENSTACK",
+					"primaryKeyRegex": "^id$",
+					"aggregation": true
 				}
 			}
 		},
@@ -67,7 +69,7 @@
 			"component": "com.sap.system.golangmengine2",
 			"metadata": {
 				"label": "Golang Operator",
-				"x": 184,
+				"x": 202,
 				"y": 12,
 				"height": 80,
 				"width": 120,
@@ -76,7 +78,7 @@
 					"main"
 				],
 				"config": {
-					"script": "package main\n\nimport (\n    \"bufio\"\n    \"bytes\"\n    \"encoding/json\"\n    \"fmt\"\n    \"regexp\"\n    \"strings\"\n)\n\nvar Output func(interface{})\nvar re = regexp.MustCompile(\"(.*)\\\\.(.*)(-.*)?\\\\.csv\")\n\nfunc main() {\n  // no special setup needed    \n}\n\nfunc schemaFromCSV(database string, table string, csv []byte) string {\n    r := bufio.NewReaderSize(bytes.NewReader(csv), 1024)\n    line, _, _ := r.ReadLine()\n    columns := strings.Split(string(line), \",\")\n\n    fields := make([]map[string]interface{}, len(columns))\n    for i := range columns {\n        fields[i] = map[string]interface{}{\"name\": columns[i], \"type\": \"string\"}\n        if columns[i] != \"id\" {\n            fields[i][\"type\"] = []string{\"null\", \"string\"}\n        }\n    }\n    schema := map[string]interface{}{\n        \"namespace\": database,\n        \"type\": \"record\",\n        \"name\": table,\n        \"fields\": fields,\n    }\n    \n    b, err := json.Marshal(schema)\n\tif err != nil {\n\t\tfmt.Println(\"error:\", err)\n\t    return \"\"\n\t}\n\treturn string(b)\n}\n\n// here implement the function with the input port name, so data coming from this input will call this function\nfunc Input(val interface{}){\n\tmessage := val.(map[string]interface{})\n\t\n\tfmt.Println(\"ccloud input arrived\")\n\t\n\t// read contents\n\tbody := message[\"Body\"].([]byte)\n\tattr := message[\"Attributes\"].(map[string]interface{})\n\tnewAttr := make(map[string]interface{}, len(attr)+2)\n\tfor key := range attr {\n\t\tnewAttr[key] = attr[key]\n\t}\n\n\tfmt.Println(\"ccloud: contents read\")\n\t\n\t// enhance header\n    filename_seg := re.FindStringSubmatch(attr[\"storage.filename\"].(string))\n\tif len(filename_seg) < 3 {\n\t    fmt.Println(\"ccloud: ERROR filename cannot be parsed\")\n\t    return\n\t}\n\t\n\tdatabase := filename_seg[1]\n\ttable := filename_seg[2]\n    newAttr[\"vora.record.definition\"] = map[string]interface{}{\"recName\": table}\n    newAttr[\"avro.schema\"] = schemaFromCSV(database, table, body)\n\n    fmt.Println(\"ccloud: output header \", newAttr)\n\n    // build transformed message\n\tnewMessage := make(map[string]interface{}, 3)\n\tnewMessage[\"Attributes\"] = newAttr\n\tnewMessage[\"Encoding\"] = message[\"Encoding\"]\n\tnewMessage[\"Body\"] = body\n\n    // output\n    fmt.Println(\"ccloud output body: \", string(body))\n\tOutput(newMessage)\n}"
+					"script": "package main\n\nimport (\n    \"bufio\"\n    \"bytes\"\n    \"encoding/json\"\n    \"fmt\"\n    \"regexp\"\n    \"strings\"\n)\n\nvar Output func(interface{})\nvar re = regexp.MustCompile(\"(.*)\\\\.(.*)(-.*)?\\\\.csv\")\n\n// data chunks in the pg_backup file begin with this instruction\nvar pgbDataChunkPrefixRE = regexp.MustCompile(\"COPY public.(.*) \\\\((.*)\\\\) FROM stdin;\")\n\nvar pgbDataChunkSuffix = \"\\\\.\"\n\nfunc main() {\n\t// no special setup needed\n}\n\nfunc readTable(database string, r *bufio.Reader) (string, string, error) {\n\t// skip lines until the prefix for data chunks is found\n\tline, incomplete, err := r.ReadLine()\n\tvar params []string = []string{}\n\tfor err == nil && !incomplete && len(params) != 3 {\n\t\tparams = pgbDataChunkPrefixRE.FindStringSubmatch(string(line))\n\t\tline, incomplete, err = r.ReadLine()\n\t}\n\n\tif err != nil {\n\t\tfmt.Println(err)\n\t\treturn \"\", \"\", err\n\t}\n\tfmt.Println(\"Found table data chunk: \", params)\n\n\t// build schema from column names relying on naming standards for OpenStack tables\n\t// IDEA: use earlier CREATE TABLE statements to build a more efficient schema\n\ttable := params[1]\n\tcolumns := strings.Split(params[2], \", \")\n\n\tfields := make([]map[string]interface{}, len(columns))\n\tfor i := range columns {\n\t\tif columns[i] == \"id\" {\n\t\t\tfields[i] = map[string]interface{}{\"name\": columns[i], \"type\": \"fixed\", \"size\": 127}\n\t\t} else if columns[i] == \"deleted\" {\n\t\t\tfields[i] = map[string]interface{}{\"name\": columns[i], \"type\": []string{\"boolean\", \"null\"}}\n\t\t} else {\n\t\t\t// treat all fields except id as nullable (union type in Avro)\n\t\t\tfields[i] = map[string]interface{}{\"name\": columns[i], \"type\": []string{\"string\", \"null\"}}\n\t\t}\n\t}\n\tschema := map[string]interface{}{\n\t\t\"namespace\": database,\n\t\t\"type\":      \"record\",\n\t\t\"name\":      table,\n\t\t\"fields\":    fields,\n\t}\n\n\tschemaStr, err := json.Marshal(schema)\n\tif err != nil {\n\t\tfmt.Println(\"error:\", err)\n\t\treturn \"\", \"\", err\n\t}\n\n\t// read data line by line until the terminating suffix shows up\n\tpayload := \"\"\n\tline, incomplete, err = r.ReadLine()\n\tfor err == nil && !incomplete &&  string(line) != pgbDataChunkSuffix {\n\t\tvalues := strings.Split(string(line), \"\\t\")\n\t\tfor i := 0; i < len(values); i++ {\n\t\t    if values[i] == \"\\\\N\" {\n\t\t    \tvalues[i] = \"\"\n\t\t    } else {\n\t\t        values[i] = strings.Replace(values[i], \"\\t\", \"    \", -1)\n\t\t    }\n\t\t}\n\t\tpayload += strings.Join(values, \"\\t\")\n\t\tline, incomplete, err = r.ReadLine()\n\t}\n\n\treturn string(schemaStr), payload, nil\n}\n\nfunc schemaFromCSV(database string, table string, csv []byte) string {\n    r := bufio.NewReaderSize(bytes.NewReader(csv), 1024)\n    line, _, _ := r.ReadLine()\n    columns := strings.Split(string(line), \",\")\n\n    fields := make([]map[string]interface{}, len(columns))\n    for i := range columns {\n        if columns[i] == \"id\" {\n            fields[i] = map[string]interface{}{\"name\": columns[i], \"type\": \"fixed\", \"size\": 127}\n        } else {\n            // treat all fields except id as nullable (union type in Avro)\n            fields[i] = map[string]interface{}{\"name\": columns[i], \"type\": []string{\"string\", \"null\"}}\n        }\n    }\n    schema := map[string]interface{}{\n        \"namespace\": database,\n        \"type\": \"record\",\n        \"name\": table,\n        \"fields\": fields,\n    }\n    \n    b, err := json.Marshal(schema)\n\tif err != nil {\n\t\tfmt.Println(\"error:\", err)\n\t    return \"\"\n\t}\n\treturn string(b)\n}\n\n// here implement the function with the input port name, so data coming from this input will call this function\nfunc Input(val interface{}){\n\tmessage := val.(map[string]interface{})\n\t\n\tfmt.Println(\"ccloud input arrived\")\n\t\n\t// read contents\n\tbody := message[\"Body\"].([]byte)\n\tattr := message[\"Attributes\"].(map[string]interface{})\n\n\tfmt.Println(\"ccloud: contents read\")\n\t\n\t// enhance header\n    filename_seg := re.FindStringSubmatch(attr[\"storage.filename\"].(string))\n\tif len(filename_seg) < 3 {\n\t    fmt.Println(\"ccloud: ERROR filename cannot be parsed\")\n\t    return\n\t}\n\t\n\tdatabase := filename_seg[1]\n\t\n\tr := bufio.NewReaderSize(bytes.NewReader(body), 8192)\n\tschema, body, err := readTable(\"Cinder\", r))\n    for err == nil && contents != \"\" {\n    \tnewAttr := make(map[string]interface{}, len(attr)+2)\n\t    for key := range attr {\n\t\t    newAttr[key] = attr[key]\n\t    }\n        newAttr[\"vora.record.definition\"] = map[string]interface{}{\"recName\": schema[\"name\"]}\n        newAttr[\"avro.schema\"] = schema\n    \n        // build transformed message\n\t    newMessage := make(map[string]interface{}, 3)\n\t    newMessage[\"Attributes\"] = newAttr\n\t    newMessage[\"Encoding\"] = message[\"Encoding\"]\n\t    newMessage[\"Body\"] = body\n\n        // output\n        fmt.Println(\"ccloud output body: \", string(body))\n\t    Output(newMessage)\n        \n        // next next\n        schema, contents, err := readTable(\"Cinder\", r))\n    }\n}"
 				},
 				"additionalinports": [
 					{
@@ -105,7 +107,8 @@
 				"width": 120,
 				"config": {
 					"format": "csv",
-					"csvHeaderIncluded": true
+					"csvHeaderIncluded": true,
+					"varLimit": 1024
 				}
 			}
 		},
@@ -119,19 +122,8 @@
 				"width": 120,
 				"ui": "dynpath",
 				"config": {
-					"spoolSize": 10
+					"spoolSize": 10000
 				}
-			}
-		},
-		"graphterminator1": {
-			"component": "com.sap.util.graphTerminator",
-			"metadata": {
-				"label": "Graph Terminator",
-				"x": 1027,
-				"y": 3,
-				"height": 80,
-				"width": 120,
-				"config": {}
 			}
 		}
 	},
@@ -139,7 +131,7 @@
 	"connections": [
 		{
 			"metadata": {
-				"points": "140,61 180,61"
+				"points": "140,61 198,61"
 			},
 			"src": {
 				"port": "outFile",
@@ -152,7 +144,7 @@
 		},
 		{
 			"metadata": {
-				"points": "308,61 335.99999952316284,61 335.99999952316284,52 363.9999990463257,52"
+				"points": "326,61 345,61 345,52 363.9999990463257,52"
 			},
 			"src": {
 				"port": "Output",
@@ -200,19 +192,6 @@
 			"tgt": {
 				"port": "in",
 				"process": "voraingestor1"
-			}
-		},
-		{
-			"metadata": {
-				"points": "995.9999990463257,52 1009.5,52 1009.5,43 1023,43"
-			},
-			"src": {
-				"port": "out",
-				"process": "voraingestor1"
-			},
-			"tgt": {
-				"port": "stop",
-				"process": "graphterminator1"
 			}
 		}
 	],
