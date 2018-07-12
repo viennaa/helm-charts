@@ -29,3 +29,5 @@ spec:
         #      fieldPath: metadata.namespace
         - name: CONFIG_MAP_NAME
           value: "postgres-operator"
+        - name: REGION_NAME
+          value: "{{.Values.global.region}}"
