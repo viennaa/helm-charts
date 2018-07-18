@@ -84,6 +84,7 @@ clusters:
     # sans_http: [repo]
 
     watcher_enabled: false
+    sapcc_ratelimit_enabled: false
 
 # rings (TODO: having the rings in here is insane, but --values is currently
 # the only way to supply region-specific data; figure out a better way)

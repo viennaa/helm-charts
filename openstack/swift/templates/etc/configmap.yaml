@@ -40,3 +40,5 @@ data:
   # openstack request watcher and classifier
   watcher.yaml: |
 {{ .Files.Get "etc/watcher.yaml" | indent 4 }}
+  rate-limit.yaml: |
+{{ .Files.Get "etc/rate-limit.yaml" | indent 4 }}

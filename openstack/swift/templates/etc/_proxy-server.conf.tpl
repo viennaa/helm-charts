@@ -27,13 +27,13 @@ log_level = INFO
 [pipeline:main]
 {{- if le $swift_release "mitaka" }}
 # Mitaka pipeline
-pipeline = catch_errors gatekeeper healthcheck proxy-logging cache cname_lookup domain_remap bulk tempurl ratelimit authtoken{{ if and $context.s3api_enabled $cluster.seed }} swift3 s3token{{ end }} {{if $cluster.watcher_enabled }}watcher {{ end }}keystoneauth sysmeta-domain-override staticweb container-quotas account-quotas slo dlo versioned_writes proxy-logging proxy-server
+pipeline = catch_errors gatekeeper healthcheck proxy-logging cache cname_lookup domain_remap bulk tempurl ratelimit authtoken{{ if and $context.s3api_enabled $cluster.seed }} swift3 s3token{{ end }} {{if $cluster.watcher_enabled }}watcher {{ end }}{{if $cluster.sapcc_ratelimit_enabled }}sapcc-ratelimit {{end}}keystoneauth sysmeta-domain-override staticweb container-quotas account-quotas slo dlo versioned_writes proxy-logging proxy-server
 {{- else if eq $swift_release "pike" }}
 # Pike pipeline
-pipeline = catch_errors gatekeeper healthcheck proxy-logging cache cname_lookup domain_remap bulk tempurl ratelimit authtoken{{ if and $context.s3api_enabled $cluster.seed }} swift3 s3token{{ end }} {{if $cluster.watcher_enabled }}watcher {{ end }}keystoneauth sysmeta-domain-override staticweb copy container-quotas account-quotas slo dlo versioned_writes proxy-logging proxy-server
+pipeline = catch_errors gatekeeper healthcheck proxy-logging cache cname_lookup domain_remap bulk tempurl ratelimit authtoken{{ if and $context.s3api_enabled $cluster.seed }} swift3 s3token{{ end }} {{if $cluster.watcher_enabled }}watcher {{ end }}{{if $cluster.sapcc_ratelimit_enabled }}sapcc-ratelimit {{end}}keystoneauth sysmeta-domain-override staticweb copy container-quotas account-quotas slo dlo versioned_writes proxy-logging proxy-server
 {{- else if ge $swift_release "queens" }}
 # Queens or > pipeline
-pipeline = catch_errors gatekeeper healthcheck proxy-logging cache cname_lookup domain_remap bulk tempurl ratelimit authtoken{{ if and $context.s3api_enabled $cluster.seed }} swift3 s3token{{ end }} {{if $cluster.watcher_enabled }}watcher {{ end }}keystoneauth sysmeta-domain-override staticweb copy container-quotas account-quotas slo dlo versioned_writes symlink proxy-logging proxy-server
+pipeline = catch_errors gatekeeper healthcheck proxy-logging cache cname_lookup domain_remap bulk tempurl ratelimit authtoken{{ if and $context.s3api_enabled $cluster.seed }} swift3 s3token{{ end }} {{if $cluster.watcher_enabled }}watcher {{ end }}{{if $cluster.sapcc_ratelimit_enabled }}sapcc-ratelimit {{end}}keystoneauth sysmeta-domain-override staticweb copy container-quotas account-quotas slo dlo versioned_writes symlink proxy-logging proxy-server
 {{- end }}
 # TODO: sentry middleware (between "proxy-logging" and "proxy-server") disabled temporarily because of weird exceptions tracing into raven, need to check further
 
@@ -202,6 +202,14 @@ service_type = object-store
 cadf_service_name = service/storage/object
 target_project_id_from_path = {{$cluster.watcher_project_id_from_path | default true}}
 config_file = /swift-etc/watcher.yaml
+{{- end }}
+
+{{ if $cluster.sapcc_ratelimit_enabled -}}
+[filter:sapcc-ratelimit]
+use = egg:rate-limit-middleware#rate-limit
+config_file = /swift-etc/rate-limit.yaml
+memcached_host = memcached.{{ $helm_release.Namespace }}.svc:11211
+cadf_service_name = service/storage/object
 {{- end }}
 
 # [filter:statsd]
