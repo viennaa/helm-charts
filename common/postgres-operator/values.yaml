@@ -1,6 +1,6 @@
 ## postgres-operator image repository
 image: monsoon/postgres-operator
-imageTag: "20180712133733"
+imageTag: "20180801152446"
 
 ## Specify a imagePullPolicy
 ## 'Always' if imageTag is 'latest', else set to 'IfNotPresent'
