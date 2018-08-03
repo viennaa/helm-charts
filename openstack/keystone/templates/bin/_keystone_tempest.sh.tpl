@@ -11,10 +11,10 @@ function start_rally_tests {
     rally deployment create --file /etc/keystone/tempest_deployment_config.json --name tempest_deployment
 
     # check if we can reach openstack endpoints
-    rally --debug deployment check
+    rally deployment check
 
     # create tempest verifier fetched from our repo
-    rally --debug verify create-verifier --type tempest --name keystone-tempest-verifier --system-wide --source https://github.com/sapcc/tempest --version ccloud
+    rally verify create-verifier --type tempest --name keystone-tempest-verifier --system-wide --source https://github.com/sapcc/tempest --version ccloud
 
     # configure tempest verifier
     rally verify configure-verifier --extend /etc/tempest/tempest.conf

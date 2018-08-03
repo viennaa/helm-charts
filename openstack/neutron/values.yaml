@@ -101,7 +101,6 @@ cisco_ucsm_bm:
     user: DEFINED-IN-REGION-CHART
     password: DEFINED-IN-REGION-CHART
     physical_network: DEFINED-IN-REGION-CHART
-    password: DEFINED-IN-REGION-CHART
     vnic_paths: DEFINED-IN-REGION-CHART
 
 
@@ -266,6 +265,9 @@ postgresql:
     enabled: false
     image_version: v0.5.15
 
+sentry:
+  enabled: true
+
 audit:
   enabled: false 
   # do by default not attach the request payloads of create/update calls to the event
@@ -280,3 +282,6 @@ rabbitmq_notifications:
 secgroup_entanglement_exporter:
   image_tag: DEFINED_IN_VALUES_FILE
   release:   DEFINED_IN_VALUES_FILE # Neutron release in lower case, e.g. "queens"
+
+watcher:
+  enabled: false

@@ -10,10 +10,12 @@ global:
   master_password: ""
   pgbouncer:
     enabled: true
+  metrics_port: 9102
+  osprofiler: {}
 
 api_port_internal: '8786'
 debug: "True"
-imageVersion: pike-20180619.1
+imageVersionManilaApi: pike-20180619.1
 
 logging:
   formatters:
@@ -70,7 +72,7 @@ memcached:
   metrics:
     enabled: true
 
-image_version_manila_nanny: '20180620045239'
+imageVersionManilaNanny: '20180620045239'
 imageVersionRally: queens-20180726.1
 imageVersionNetappManilaNanny: pike-20180627131707
 nanny:
@@ -249,7 +251,10 @@ rabbitmq:
 sentry:
   enabled: true
 
-tempest_enabled: false
+tempest:
+  domain_id: null
+  enabled: false
+  revert_to_snapshot_tests: false
 
 # Dictionary mapping availability-zones to shares
 # shares:
@@ -280,3 +285,6 @@ audit:
 
 rabbitmq_notifications:
   name: manila
+
+watcher:
+  enabled: false

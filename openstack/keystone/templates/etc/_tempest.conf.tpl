@@ -1,3 +1,8 @@
+[DEFAULT]
+debug = True
+use_stderr = True
+rally_debug = True
+
 [auth]
 use_dynamic_credentials = true
 create_isolated_networks = false
